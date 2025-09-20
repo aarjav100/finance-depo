@@ -15,6 +15,7 @@ import budgetRoutes from './routes/budgets';
 import categoryRoutes from './routes/categories';
 import analyticsRoutes from './routes/analytics';
 import aiRoutes from './routes/ai';
+import locationRoutes from './routes/location';
 
 // Load environment variables
 dotenv.config();
@@ -32,7 +33,7 @@ async function testDatabaseConnection() {
     const userCount = await prisma.user.count();
     console.log(`📊 MongoDB Atlas ready - Users: ${userCount}`);
   } catch (error) {
-    console.error('❌ MongoDB Atlas connection failed:', error.message);
+    console.error('❌ MongoDB Atlas connection failed:', error instanceof Error ? error.message : 'Unknown error');
     console.log('🔄 Server will continue with limited functionality');
   }
 }
@@ -101,6 +102,7 @@ app.use('/api/budgets', budgetRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/location', locationRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

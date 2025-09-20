@@ -10,7 +10,8 @@ import { Analytics } from '@/components/Analytics';
 import { AIRecommendations } from '@/components/AIRecommendations';
 import { PrivacyDashboard } from '@/components/PrivacyDashboard';
 import { TransactionDashboard } from '@/components/TransactionDashboard';
-import { DollarSign, TrendingUp, PieChart, Target, LogOut, Sparkles, BarChart3, Brain, Shield, Receipt } from 'lucide-react';
+import { LocationMap } from '@/components/LocationMap';
+import { DollarSign, TrendingUp, PieChart, Target, LogOut, Sparkles, BarChart3, Brain, Shield, Receipt, Map } from 'lucide-react';
 
 interface DashboardStats {
   totalExpenses: number;
@@ -199,14 +200,15 @@ const Dashboard = () => {
         <div>
           <Tabs defaultValue="expenses" className="space-y-8">
             <div className="relative">
-              <TabsList className="grid w-full grid-cols-6 bg-gradient-card border border-border/50 p-1 rounded-xl shadow-soft">
+              <TabsList className="grid w-full grid-cols-7 bg-gradient-card border border-border/50 p-1 rounded-xl shadow-soft">
                 {[
                   { value: "transactions", label: "Transactions", icon: Receipt },
                   { value: "expenses", label: "Expenses", icon: DollarSign },
                   { value: "budgets", label: "Budgets", icon: Target },
                   { value: "analytics", label: "Analytics", icon: BarChart3 },
                   { value: "ai", label: "AI Insights", icon: Brain },
-                  { value: "privacy", label: "Privacy", icon: Shield }
+                  { value: "privacy", label: "Privacy", icon: Shield },
+                  { value: "location", label: "Location", icon: Map }
                 ].map((tab) => (
                   <TabsTrigger 
                     key={tab.value}
@@ -243,6 +245,10 @@ const Dashboard = () => {
 
               <TabsContent value="privacy">
                 <PrivacyDashboard />
+              </TabsContent>
+
+              <TabsContent value="location">
+                <LocationMap />
               </TabsContent>
             </div>
           </Tabs>

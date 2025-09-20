@@ -50,7 +50,11 @@ export const authenticateToken = async (
       });
     }
 
-    req.user = user;
+    req.user = {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName || undefined
+    };
     next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
