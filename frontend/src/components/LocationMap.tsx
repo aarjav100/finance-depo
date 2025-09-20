@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { InteractiveMap } from '@/components/InteractiveMap';
 
 interface Location {
   id: string;
@@ -80,6 +81,7 @@ export function LocationMap() {
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<LocationSuggestion[]>([]);
+  const [clickedCoordinates, setClickedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -414,7 +416,14 @@ export function LocationMap() {
                   Add a location to track expenses and get AI suggestions
                 </DialogDescription>
               </DialogHeader>
-              <LocationForm onSubmit={handleAddLocation} onCancel={() => setShowAddLocation(false)} />
+              <LocationForm 
+                onSubmit={handleAddLocation} 
+                onCancel={() => {
+                  setShowAddLocation(false);
+                  setClickedCoordinates(null);
+                }}
+                initialCoordinates={clickedCoordinates}
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -576,38 +585,62 @@ export function LocationMap() {
         </Card>
       )}
 
-      {/* Map Visualization Placeholder */}
+      {/* Interactive Map */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Map className="w-5 h-5" />
-            Location Map
+            Interactive Location Map
           </CardTitle>
           <CardDescription>
-            Interactive map showing your locations and spending patterns
+            Click on markers to view location details, or click on the map to add new locations
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-96 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg flex items-center justify-center border-2 border-dashed border-blue-200">
-            <div className="text-center">
-              <Map className="w-16 h-16 mx-auto text-blue-400 mb-4" />
-              <h3 className="text-lg font-semibold text-blue-700 mb-2">Interactive Map</h3>
-              <p className="text-blue-600 mb-4">
-                Map visualization would be integrated here with a service like Google Maps or Mapbox
-              </p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {locations.slice(0, 3).map((location) => (
-                  <Badge key={location.id} variant="outline" className="text-xs">
-                    {getLocationIcon(location.type)}
-                    <span className="ml-1">{location.name}</span>
-                  </Badge>
-                ))}
-                {locations.length > 3 && (
-                  <Badge variant="outline" className="text-xs">
-                    +{locations.length - 3} more
-                  </Badge>
-                )}
-              </div>
+          <div className="h-96 rounded-lg overflow-hidden border">
+            <InteractiveMap
+              locations={locations}
+              currentLocation={currentLocation}
+              onLocationSelect={handleLocationSelect}
+              onMapClick={(lat, lng) => {
+                // Open add location dialog with pre-filled coordinates
+                setClickedCoordinates({ lat, lng });
+                setShowAddLocation(true);
+              }}
+              height="100%"
+              className="rounded-lg"
+            />
+          </div>
+          
+          {/* Map Legend */}
+          <div className="mt-4 flex flex-wrap gap-4 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+              <span>Home</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+              <span>Work</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              <span>Restaurant</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+              <span>Shopping</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <span>Gas Station</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-pink-500"></div>
+              <span>Entertainment</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <span>Your Location</span>
             </div>
           </div>
         </CardContent>
@@ -619,20 +652,33 @@ export function LocationMap() {
 // Location Form Component
 function LocationForm({ 
   onSubmit, 
-  onCancel 
+  onCancel,
+  initialCoordinates
 }: { 
   onSubmit: (data: Partial<Location>) => void; 
-  onCancel: () => void; 
+  onCancel: () => void;
+  initialCoordinates?: { lat: number; lng: number } | null;
 }) {
   const [formData, setFormData] = useState({
     name: '',
     address: '',
-    latitude: 0,
-    longitude: 0,
+    latitude: initialCoordinates?.lat || 0,
+    longitude: initialCoordinates?.lng || 0,
     type: 'other' as Location['type'],
     category: 'Other',
     averageSpending: 0
   });
+
+  // Update form data when initial coordinates change
+  useEffect(() => {
+    if (initialCoordinates) {
+      setFormData(prev => ({
+        ...prev,
+        latitude: initialCoordinates.lat,
+        longitude: initialCoordinates.lng
+      }));
+    }
+  }, [initialCoordinates]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -698,6 +744,34 @@ function LocationForm({
             placeholder="-74.0060"
             required
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Get Current Location</Label>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                  (position) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      latitude: position.coords.latitude,
+                      longitude: position.coords.longitude
+                    }));
+                  },
+                  (error) => {
+                    console.error('Error getting location:', error);
+                  }
+                );
+              }
+            }}
+            className="w-full"
+          >
+            <Navigation className="w-4 h-4 mr-2" />
+            Use My Current Location
+          </Button>
         </div>
 
         <div className="space-y-2">
