@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,15 +28,7 @@ const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-    loadStats();
-  }, [user, navigate]);
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       
@@ -66,22 +58,66 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleSignOut = async () => {
+  useEffect(() => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    loadStats();
+  }, [user, navigate, loadStats]);
+
+  const handleSignOut = useCallback(async () => {
     await signOut();
     navigate('/');
-  };
+  }, [signOut, navigate]);
 
-  const refreshStats = () => {
+  const refreshStats = useCallback(() => {
     loadStats();
-  };
+  }, [loadStats]);
+
+  const statCards = useMemo(() => [
+    {
+      title: "Total Expenses",
+      value: `$${stats.totalExpenses.toFixed(2)}`,
+      icon: DollarSign,
+      gradient: "from-blue-400 to-cyan-400",
+      description: "All-time expenses"
+    },
+    {
+      title: "This Month",
+      value: `$${stats.monthlyExpenses.toFixed(2)}`,
+      icon: TrendingUp,
+      gradient: "from-green-400 to-emerald-400",
+      description: "Current month spending"
+    },
+    {
+      title: "Categories",
+      value: stats.categoriesCount.toString(),
+      icon: PieChart,
+      gradient: "from-purple-400 to-violet-400",
+      description: "Expense categories"
+    },
+    {
+      title: "Active Budgets",
+      value: stats.budgetsCount.toString(),
+      icon: Target,
+      gradient: "from-orange-400 to-red-400",
+      description: "Budget tracking"
+    }
+  ], [stats]);
+
+  // Prevent flickering by not showing loading if user is available
+  if (!user) {
+    return null;
+  }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
-        <div className="text-center animate-fade-in-up">
-          <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center mb-6 mx-auto animate-pulse-glow">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center mb-6 mx-auto">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
           </div>
           <p className="text-foreground font-medium text-lg">Loading your dashboard...</p>
@@ -91,37 +127,6 @@ const Dashboard = () => {
     );
   }
 
-  const statCards = [
-    {
-      title: "Total Expenses",
-      value: `$${stats.totalExpenses.toFixed(2)}`,
-      icon: DollarSign,
-      gradient: "from-blue-500 to-cyan-500",
-      description: "All-time expenses"
-    },
-    {
-      title: "This Month",
-      value: `$${stats.monthlyExpenses.toFixed(2)}`,
-      icon: TrendingUp,
-      gradient: "from-green-500 to-emerald-500",
-      description: "Current month spending"
-    },
-    {
-      title: "Categories",
-      value: stats.categoriesCount.toString(),
-      icon: PieChart,
-      gradient: "from-purple-500 to-violet-500",
-      description: "Expense categories"
-    },
-    {
-      title: "Active Budgets",
-      value: stats.budgetsCount.toString(),
-      icon: Target,
-      gradient: "from-orange-500 to-red-500",
-      description: "Budget tracking"
-    }
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-hero">
       {/* Enhanced Header */}
@@ -129,9 +134,9 @@ const Dashboard = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5"></div>
         <div className="container mx-auto px-4 py-6 relative">
           <div className="flex justify-between items-center">
-            <div className="animate-fade-in-left">
+            <div>
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center animate-pulse-glow">
+                <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center">
                   <Sparkles className="w-5 h-5 text-white" />
                 </div>
                 <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
@@ -146,7 +151,7 @@ const Dashboard = () => {
             <Button 
               variant="outline" 
               onClick={handleSignOut}
-              className="group hover:scale-105 transition-all duration-300 hover:shadow-glow animate-fade-in-right"
+              className="group hover:scale-105 transition-all duration-300"
             >
               <LogOut className="w-4 h-4 mr-2 group-hover:rotate-12 transition-transform duration-300" />
               Sign Out
@@ -158,21 +163,19 @@ const Dashboard = () => {
       <div className="container mx-auto px-4 py-8">
         {/* Enhanced Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {statCards.map((stat, index) => (
+          {statCards.map((stat) => (
             <Card 
               key={stat.title}
-              className="group relative overflow-hidden border-0 shadow-card bg-gradient-card hover:shadow-floating transition-all duration-700 hover:-translate-y-2 animate-scale-in cursor-pointer"
-              style={{ animationDelay: `${index * 0.1}s` }}
+              className="group relative overflow-hidden border-0 shadow-card bg-gradient-card hover:shadow-floating transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.02]"
             >
-              <div className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-10 transition-opacity duration-500 from-primary to-accent"></div>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-5 group-hover:opacity-10 transition-opacity duration-500 from-primary to-transparent rounded-full -translate-y-16 translate-x-16"></div>
+              <div className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-10 transition-opacity duration-300 from-primary to-accent"></div>
               
               <CardHeader className="pb-2 relative">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
                     {stat.title}
                   </CardTitle>
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center group-hover:scale-110 group-hover:rotate-12 transition-all duration-500 shadow-glow animate-breathe`}>
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center group-hover:scale-110 transition-transform duration-200`}>
                     <stat.icon className="w-5 h-5 text-white" />
                   </div>
                 </div>
@@ -191,7 +194,7 @@ const Dashboard = () => {
         </div>
 
         {/* Enhanced Main Content */}
-        <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+        <div>
           <Tabs defaultValue="expenses" className="space-y-8">
             <div className="relative">
               <TabsList className="grid w-full grid-cols-4 bg-gradient-card border border-border/50 p-1 rounded-xl shadow-soft">
@@ -200,12 +203,11 @@ const Dashboard = () => {
                   { value: "budgets", label: "Budgets", icon: Target },
                   { value: "analytics", label: "Analytics", icon: BarChart3 },
                   { value: "ai", label: "AI Insights", icon: Brain }
-                ].map((tab, index) => (
+                ].map((tab) => (
                   <TabsTrigger 
                     key={tab.value}
                     value={tab.value}
-                    className="relative flex items-center gap-2 data-[state=active]:bg-gradient-primary data-[state=active]:text-white data-[state=active]:shadow-glow transition-all duration-300 hover:scale-105 animate-fade-in"
-                    style={{ animationDelay: `${index * 0.1}s` }}
+                    className="relative flex items-center gap-2 data-[state=active]:bg-gradient-primary data-[state=active]:text-white data-[state=active]:shadow-glow transition-all duration-300 hover:scale-105"
                   >
                     <tab.icon className="w-4 h-4" />
                     <span className="hidden sm:inline">{tab.label}</span>
@@ -215,32 +217,20 @@ const Dashboard = () => {
             </div>
 
             <div className="relative">
-              <TabsContent value="expenses" className="animate-fade-in-up">
-                <div className="relative">
-                  <div className="absolute -inset-4 bg-gradient-to-r from-primary/10 via-transparent to-accent/10 rounded-2xl opacity-0 animate-fade-in" style={{ animationDelay: '0.2s' }}></div>
-                  <ExpenseTracker onExpenseAdded={refreshStats} />
-                </div>
+              <TabsContent value="expenses">
+                <ExpenseTracker onExpenseAdded={refreshStats} />
               </TabsContent>
 
-              <TabsContent value="budgets" className="animate-fade-in-up">
-                <div className="relative">
-                  <div className="absolute -inset-4 bg-gradient-to-r from-green-500/10 via-transparent to-blue-500/10 rounded-2xl opacity-0 animate-fade-in" style={{ animationDelay: '0.2s' }}></div>
-                  <BudgetManager onBudgetChanged={refreshStats} />
-                </div>
+              <TabsContent value="budgets">
+                <BudgetManager onBudgetChanged={refreshStats} />
               </TabsContent>
 
-              <TabsContent value="analytics" className="animate-fade-in-up">
-                <div className="relative">
-                  <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/10 via-transparent to-pink-500/10 rounded-2xl opacity-0 animate-fade-in" style={{ animationDelay: '0.2s' }}></div>
-                  <Analytics />
-                </div>
+              <TabsContent value="analytics">
+                <Analytics />
               </TabsContent>
 
-              <TabsContent value="ai" className="animate-fade-in-up">
-                <div className="relative">
-                  <div className="absolute -inset-4 bg-gradient-to-r from-orange-500/10 via-transparent to-red-500/10 rounded-2xl opacity-0 animate-fade-in" style={{ animationDelay: '0.2s' }}></div>
-                  <AIRecommendations />
-                </div>
+              <TabsContent value="ai">
+                <AIRecommendations />
               </TabsContent>
             </div>
           </Tabs>

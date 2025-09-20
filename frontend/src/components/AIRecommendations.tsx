@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Lightbulb, TrendingDown, Target, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface Recommendation {
   type: 'savings' | 'budget' | 'category' | 'trend';
@@ -38,82 +38,62 @@ export function AIRecommendations() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (user) {
-      loadSpendingData();
-    }
-  }, [user]);
-
-  const loadSpendingData = async () => {
+  const loadSpendingData = useCallback(async () => {
     setLoading(true);
     try {
-      // Get all expenses
-      const { data: allExpenses } = await supabase
-        .from('expenses')
-        .select(`
-          amount,
-          expense_date,
-          expense_categories (name)
-        `)
-        .eq('user_id', user?.id);
+      const token = localStorage.getItem('token');
+      
+      // Get analytics overview data
+      const response = await fetch('http://localhost:3002/api/analytics/overview', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-      // Get current month expenses
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      const monthlyExpenses = allExpenses?.filter(expense => 
-        expense.expense_date.startsWith(currentMonth)
-      ) || [];
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics data');
+      }
 
-      // Calculate category breakdown
-      const categoryTotals = (allExpenses || []).reduce((acc: Record<string, number>, expense) => {
-        const category = expense.expense_categories?.name || 'Other';
-        if (!acc[category]) acc[category] = 0;
-        acc[category] += Number(expense.amount);
-        return acc;
-      }, {});
+      const result = await response.json();
+      const analytics = result.data;
 
-      const totalExpenses = Object.values(categoryTotals).reduce((sum, amount) => sum + amount, 0);
-      const categoryBreakdown = Object.entries(categoryTotals).map(([category, amount]) => ({
-        category,
-        amount,
-        percentage: (amount / totalExpenses) * 100
-      })).sort((a, b) => b.amount - a.amount);
+      // Get category breakdown
+      const categoryResponse = await fetch('http://localhost:3002/api/analytics/categories', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      let categoryBreakdown = [];
+      if (categoryResponse.ok) {
+        const categoryResult = await categoryResponse.json();
+        categoryBreakdown = categoryResult.data.categories || [];
+      }
 
       // Get budget status
-      const { data: budgets } = await supabase
-        .from('budgets')
-        .select(`
-          amount,
-          category_id,
-          expense_categories (name)
-        `)
-        .eq('user_id', user?.id)
-        .eq('is_active', true);
+      const budgetResponse = await fetch('http://localhost:3002/api/budgets', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-      const budgetStatus = await Promise.all(
-        (budgets || []).map(async (budget) => {
-          const { data: expenses } = await supabase
-            .from('expenses')
-            .select('amount')
-            .eq('user_id', user?.id)
-            .eq('category_id', budget.category_id)
-            .gte('expense_date', `${currentMonth}-01`)
-            .lt('expense_date', `${currentMonth}-32`);
-
-          const spent = expenses?.reduce((sum, exp) => sum + Number(exp.amount), 0) || 0;
-          const budgetAmount = Number(budget.amount);
-
-          return {
-            category: budget.expense_categories?.name || 'Other',
-            budget: budgetAmount,
-            spent,
-            percentage: (spent / budgetAmount) * 100
-          };
-        })
-      );
+      let budgetStatus = [];
+      if (budgetResponse.ok) {
+        const budgetResult = await budgetResponse.json();
+        budgetStatus = (budgetResult.data.budgets || []).map((budget: any) => ({
+          category: budget.category?.name || 'Other',
+          budget: budget.amount,
+          spent: budget.spent || 0,
+          percentage: budget.spent ? (budget.spent / budget.amount) * 100 : 0
+        }));
+      }
 
       const data: SpendingData = {
-        totalExpenses,
-        monthlyExpenses: monthlyExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0),
+        totalExpenses: analytics.totalExpenses || 0,
+        monthlyExpenses: analytics.monthlyExpenses || 0,
         categoryBreakdown,
         budgetStatus
       };
@@ -130,7 +110,13 @@ export function AIRecommendations() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (user) {
+      loadSpendingData();
+    }
+  }, [user, loadSpendingData]);
 
   const generateRuleBasedRecommendations = (data: SpendingData) => {
     const recs: Recommendation[] = [];
@@ -181,6 +167,25 @@ export function AIRecommendations() {
         title: 'Spending Diversification',
         description: `You have expenses across ${data.categoryBreakdown.length} categories. Consider consolidating similar expenses or focusing on your top 3-4 spending categories for better budget control.`,
         impact: 'low',
+        actionable: true
+      });
+    }
+
+    // Add some general recommendations if no specific ones
+    if (recs.length === 0) {
+      recs.push({
+        type: 'savings',
+        title: 'Start Tracking Your Expenses',
+        description: 'Begin by adding your daily expenses to get personalized insights and recommendations for better financial health.',
+        impact: 'medium',
+        actionable: true
+      });
+      
+      recs.push({
+        type: 'budget',
+        title: 'Create Your First Budget',
+        description: 'Set up budgets for your main spending categories to better control your finances and track your progress.',
+        impact: 'high',
         actionable: true
       });
     }
@@ -301,8 +306,22 @@ Focus on practical, actionable advice for improving financial health.`;
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold">AI Insights</h2>
+            <p className="text-muted-foreground">Get personalized financial recommendations</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center p-16">
+          <div className="text-center">
+            <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center mb-4 mx-auto">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+            </div>
+            <p className="text-foreground font-medium">Loading insights...</p>
+            <p className="text-muted-foreground text-sm mt-2">Analyzing your financial data</p>
+          </div>
+        </div>
       </div>
     );
   }

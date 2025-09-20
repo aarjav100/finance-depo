@@ -40,17 +40,17 @@ All colors MUST be HSL.
 
     --radius: 1rem;
 
-    /* Modern gradients inspired by the reference */
-    --gradient-primary: linear-gradient(135deg, hsl(220 100% 50%) 0%, hsl(200 100% 50%) 100%);
-    --gradient-hero: linear-gradient(135deg, hsl(220 100% 96%) 0%, hsl(0 0% 100%) 50%, hsl(220 20% 97%) 100%);
-    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(220 100% 98%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(200 100% 50%) 0%, hsl(220 100% 60%) 100%);
+    /* Soft, modern gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(220 85% 55%) 0%, hsl(200 85% 55%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(220 100% 98%) 0%, hsl(0 0% 100%) 50%, hsl(220 15% 98%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(220 100% 99%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(200 85% 55%) 0%, hsl(220 85% 60%) 100%);
     
-    /* Clean shadows */
-    --shadow-card: 0 4px 24px hsl(220 100% 50% / 0.08);
-    --shadow-floating: 0 8px 32px hsl(220 100% 50% / 0.12);
-    --shadow-glow: 0 0 40px hsl(220 100% 50% / 0.2);
-    --shadow-soft: 0 2px 12px hsl(220 100% 50% / 0.06);
+    /* Soft, subtle shadows */
+    --shadow-card: 0 2px 16px hsl(220 85% 55% / 0.06);
+    --shadow-floating: 0 4px 24px hsl(220 85% 55% / 0.08);
+    --shadow-glow: 0 0 24px hsl(220 85% 55% / 0.12);
+    --shadow-soft: 0 1px 8px hsl(220 85% 55% / 0.04);
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -108,5 +108,36 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Performance optimizations */
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Optimize animations */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* GPU acceleration for smooth animations */
+  .animate-fade-in,
+  .animate-fade-in-up,
+  .animate-scale-in,
+  .animate-slide-up {
+    will-change: transform, opacity;
+    transform: translateZ(0);
   }
 }

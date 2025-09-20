@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -13,10 +13,11 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, AlertTriangle, Target, TrendingDown, TrendingUp, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import CategoryService, { Category } from '@/services/categoryService';
 
 const budgetSchema = z.object({
   amount: z.string().refine(val => !isNaN(Number(val)) && Number(val) > 0, 'Amount must be a positive number'),
-  category_id: z.string().min(1, 'Category is required'),
+  categoryId: z.string().min(1, 'Category is required'),
   period: z.enum(['weekly', 'monthly', 'yearly'])
 });
 
@@ -36,12 +37,6 @@ interface Budget {
   spent: number;
 }
 
-interface Category {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-}
 
 interface BudgetManagerProps {
   onBudgetChanged: () => void;
@@ -59,7 +54,7 @@ export function BudgetManager({ onBudgetChanged }: BudgetManagerProps) {
     resolver: zodResolver(budgetSchema),
     defaultValues: {
       amount: '',
-      category_id: '',
+      categoryId: '',
       period: 'monthly'
     }
   });
@@ -136,20 +131,8 @@ export function BudgetManager({ onBudgetChanged }: BudgetManagerProps) {
 
   const loadCategories = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3002/api/categories', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch categories');
-      }
-
-      const result = await response.json();
-      setCategories(result.data.categories || []);
+      const categories = await CategoryService.getCategories();
+      setCategories(categories);
     } catch (error) {
       console.error('Error loading categories:', error);
     }
@@ -173,7 +156,19 @@ export function BudgetManager({ onBudgetChanged }: BudgetManagerProps) {
 
   const handleSubmit = async (data: BudgetData) => {
     try {
+      console.log('Form data received:', data);
+      console.log('Form errors:', form.formState.errors);
+      
       const token = localStorage.getItem('token');
+      
+      const requestBody = {
+        amount: parseFloat(data.amount),
+        categoryId: data.categoryId,
+        period: data.period,
+        startDate: new Date().toISOString()
+      };
+      
+      console.log('Sending budget request:', requestBody);
       
       const response = await fetch('http://localhost:3002/api/budgets', {
         method: 'POST',
@@ -181,17 +176,19 @@ export function BudgetManager({ onBudgetChanged }: BudgetManagerProps) {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          amount: parseFloat(data.amount),
-          categoryId: data.category_id,
-          period: data.period,
-          startDate: new Date().toISOString().split('T')[0],
-          isActive: true
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Budget creation error:', errorData);
+        
+        // Show detailed validation errors if available
+        if (errorData.details && Array.isArray(errorData.details)) {
+          const errorMessages = errorData.details.map((detail: any) => detail.message).join(', ');
+          throw new Error(`Validation failed: ${errorMessages}`);
+        }
+        
         throw new Error(errorData.error || 'Failed to create budget');
       }
 
@@ -291,12 +288,12 @@ export function BudgetManager({ onBudgetChanged }: BudgetManagerProps) {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in-up">
+    <div className="space-y-8">
       {/* Enhanced Header */}
       <div className="flex justify-between items-center">
-        <div className="animate-fade-in-left">
+        <div>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center animate-breathe shadow-glow">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center">
               <Target className="w-5 h-5 text-white" />
             </div>
             <h2 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
@@ -308,7 +305,7 @@ export function BudgetManager({ onBudgetChanged }: BudgetManagerProps) {
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="group bg-gradient-primary hover:shadow-glow transition-all duration-300 hover:scale-105 animate-fade-in-right">
+            <Button className="group bg-gradient-primary hover:shadow-glow transition-all duration-300 hover:scale-105">
               <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform duration-300" />
               Create Budget
             </Button>
@@ -323,24 +320,30 @@ export function BudgetManager({ onBudgetChanged }: BudgetManagerProps) {
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
               <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
                 <Label className="text-sm font-medium">Category</Label>
-                <Select onValueChange={(value) => form.setValue('category_id', value)}>
-                  <SelectTrigger className="mt-2 transition-all duration-300 focus:shadow-glow">
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg">{category.icon}</span>
-                          <span>{category.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.formState.errors.category_id && (
+                <Controller
+                  name="categoryId"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger className="mt-2 transition-all duration-300 focus:shadow-glow">
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg">{category.icon}</span>
+                              <span>{category.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {form.formState.errors.categoryId && (
                   <p className="text-sm text-destructive mt-2 animate-fade-in">
-                    {form.formState.errors.category_id.message}
+                    {form.formState.errors.categoryId.message}
                   </p>
                 )}
               </div>
@@ -367,16 +370,22 @@ export function BudgetManager({ onBudgetChanged }: BudgetManagerProps) {
                   <Clock className="w-4 h-4" />
                   Period
                 </Label>
-                <Select onValueChange={(value: 'weekly' | 'monthly' | 'yearly') => form.setValue('period', value)} defaultValue="monthly">
-                  <SelectTrigger className="mt-2 transition-all duration-300 focus:shadow-glow">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="yearly">Yearly</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="period"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger className="mt-2 transition-all duration-300 focus:shadow-glow">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
 
               <div className="flex gap-3 pt-4 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>

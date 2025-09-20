@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, Edit, Calendar, DollarSign, Receipt } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import CategoryService, { Category } from '@/services/categoryService';
 
 const expenseSchema = z.object({
   amount: z.string().refine(val => !isNaN(Number(val)) && Number(val) > 0, 'Amount must be a positive number'),
@@ -34,12 +35,6 @@ interface Expense {
   } | null;
 }
 
-interface Category {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-}
 
 interface ExpenseTrackerProps {
   onExpenseAdded: () => void;
@@ -100,20 +95,8 @@ export function ExpenseTracker({ onExpenseAdded }: ExpenseTrackerProps) {
 
   const loadCategories = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3002/api/categories', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch categories');
-      }
-
-      const result = await response.json();
-      setCategories(result.data.categories || []);
+      const categories = await CategoryService.getCategories();
+      setCategories(categories);
     } catch (error) {
       console.error('Error loading categories:', error);
     }
@@ -213,12 +196,12 @@ export function ExpenseTracker({ onExpenseAdded }: ExpenseTrackerProps) {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in-up">
+    <div className="space-y-8">
       {/* Enhanced Header */}
       <div className="flex justify-between items-center">
-        <div className="animate-fade-in-left">
+        <div>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center animate-breathe shadow-glow">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
               <Receipt className="w-5 h-5 text-white" />
             </div>
             <h2 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
@@ -230,7 +213,7 @@ export function ExpenseTracker({ onExpenseAdded }: ExpenseTrackerProps) {
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="group bg-gradient-primary hover:shadow-glow transition-all duration-300 hover:scale-105 animate-fade-in-right">
+            <Button className="group bg-gradient-primary hover:shadow-glow transition-all duration-300 hover:scale-105">
               <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform duration-300" />
               Add Expense
             </Button>

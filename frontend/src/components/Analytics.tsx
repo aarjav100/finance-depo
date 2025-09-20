@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
@@ -34,9 +34,9 @@ export function Analytics() {
     if (user) {
       loadAnalyticsData();
     }
-  }, [user, timeRange]);
+  }, [user, loadAnalyticsData]);
 
-  const loadAnalyticsData = async () => {
+  const loadAnalyticsData = useCallback(async () => {
     setLoading(true);
     try {
       await Promise.all([
@@ -49,7 +49,7 @@ export function Analytics() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange]);
 
   const loadExpensesByCategory = async () => {
     try {
@@ -154,8 +154,22 @@ export function Analytics() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold">Analytics</h2>
+            <p className="text-muted-foreground">Visualize your spending patterns</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center p-16">
+          <div className="text-center">
+            <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center mb-4 mx-auto">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+            </div>
+            <p className="text-foreground font-medium">Loading analytics...</p>
+            <p className="text-muted-foreground text-sm mt-2">Processing your financial data</p>
+          </div>
+        </div>
       </div>
     );
   }
