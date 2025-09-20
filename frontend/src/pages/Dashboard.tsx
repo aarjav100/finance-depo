@@ -8,7 +8,9 @@ import { ExpenseTracker } from '@/components/ExpenseTracker';
 import { BudgetManager } from '@/components/BudgetManager';
 import { Analytics } from '@/components/Analytics';
 import { AIRecommendations } from '@/components/AIRecommendations';
-import { DollarSign, TrendingUp, PieChart, Target, LogOut, Sparkles, BarChart3, Brain } from 'lucide-react';
+import { PrivacyDashboard } from '@/components/PrivacyDashboard';
+import { TransactionDashboard } from '@/components/TransactionDashboard';
+import { DollarSign, TrendingUp, PieChart, Target, LogOut, Sparkles, BarChart3, Brain, Shield, Receipt } from 'lucide-react';
 
 interface DashboardStats {
   totalExpenses: number;
@@ -197,12 +199,14 @@ const Dashboard = () => {
         <div>
           <Tabs defaultValue="expenses" className="space-y-8">
             <div className="relative">
-              <TabsList className="grid w-full grid-cols-4 bg-gradient-card border border-border/50 p-1 rounded-xl shadow-soft">
+              <TabsList className="grid w-full grid-cols-6 bg-gradient-card border border-border/50 p-1 rounded-xl shadow-soft">
                 {[
+                  { value: "transactions", label: "Transactions", icon: Receipt },
                   { value: "expenses", label: "Expenses", icon: DollarSign },
                   { value: "budgets", label: "Budgets", icon: Target },
                   { value: "analytics", label: "Analytics", icon: BarChart3 },
-                  { value: "ai", label: "AI Insights", icon: Brain }
+                  { value: "ai", label: "AI Insights", icon: Brain },
+                  { value: "privacy", label: "Privacy", icon: Shield }
                 ].map((tab) => (
                   <TabsTrigger 
                     key={tab.value}
@@ -217,6 +221,10 @@ const Dashboard = () => {
             </div>
 
             <div className="relative">
+              <TabsContent value="transactions">
+                <TransactionDashboard />
+              </TabsContent>
+
               <TabsContent value="expenses">
                 <ExpenseTracker onExpenseAdded={refreshStats} />
               </TabsContent>
@@ -231,6 +239,10 @@ const Dashboard = () => {
 
               <TabsContent value="ai">
                 <AIRecommendations />
+              </TabsContent>
+
+              <TabsContent value="privacy">
+                <PrivacyDashboard />
               </TabsContent>
             </div>
           </Tabs>
