@@ -144,6 +144,52 @@ export class AIService {
     }
   }
 
+  static async generateCustomRecommendations(prompt: string): Promise<Recommendation[]> {
+    try {
+      // Check if OpenAI is available
+      if (!process.env.OPENAI_API_KEY) {
+        console.warn('OpenAI API key not configured, returning fallback recommendations');
+        return this.getFallbackRecommendations();
+      }
+
+      const openai = this.getOpenAI();
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a personal finance advisor. Provide practical, actionable recommendations based on the provided spending data. Always respond with valid JSON array format with the following structure: [{"type": "savings|budget|category|trend", "title": "Title", "description": "Description", "impact": "high|medium|low", "actionable": true}]'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      });
+
+      const response = completion.choices[0]?.message?.content;
+      if (!response) {
+        throw new Error('No response from AI');
+      }
+
+      try {
+        const recommendations = JSON.parse(response);
+        return Array.isArray(recommendations) ? recommendations : [];
+      } catch (error) {
+        console.error('Failed to parse AI response:', response);
+        // Fallback: try to extract recommendations from text
+        return this.parseTextRecommendations(response);
+      }
+    } catch (error) {
+      console.error('Error generating custom AI recommendations:', error);
+      // Return fallback recommendations instead of throwing error
+      return this.getFallbackRecommendations();
+    }
+  }
+
   private static generateRuleBasedRecommendations(data: SpendingData): Recommendation[] {
     const recs: Recommendation[] = [];
 
@@ -260,6 +306,79 @@ Focus on practical, actionable advice for improving financial health.`;
       console.error('Failed to parse AI response:', response);
       return [];
     }
+  }
+
+  private static getFallbackRecommendations(): Recommendation[] {
+    return [
+      {
+        type: 'savings',
+        title: 'Track Your Daily Expenses',
+        description: 'Start by recording every expense, no matter how small. This awareness often leads to natural spending reductions of 10-20%.',
+        impact: 'high',
+        actionable: true
+      },
+      {
+        type: 'budget',
+        title: 'Follow the 50/30/20 Rule',
+        description: 'Allocate 50% of income to needs, 30% to wants, and 20% to savings and debt repayment for balanced financial health.',
+        impact: 'high',
+        actionable: true
+      },
+      {
+        type: 'category',
+        title: 'Review Subscription Services',
+        description: 'Audit your monthly subscriptions and cancel any you don\'t actively use. This can save $50-200+ per month.',
+        impact: 'medium',
+        actionable: true
+      },
+      {
+        type: 'trend',
+        title: 'Set Up Automatic Savings',
+        description: 'Automate your savings by setting up automatic transfers to a separate savings account on payday.',
+        impact: 'high',
+        actionable: true
+      },
+      {
+        type: 'savings',
+        title: 'Build an Emergency Fund',
+        description: 'Aim to save 3-6 months of expenses in an emergency fund to avoid debt during unexpected situations.',
+        impact: 'high',
+        actionable: true
+      }
+    ];
+  }
+
+  private static parseTextRecommendations(text: string): Recommendation[] {
+    const recommendations: Recommendation[] = [];
+    const lines = text.split('\n').filter(line => line.trim());
+    
+    lines.forEach(line => {
+      // Try to parse different formats
+      const match1 = line.match(/(\d+)\.\s*\[?(.+?)\]?\s*-\s*(.+?)\s*\(Impact:\s*(High|Medium|Low)\)/i);
+      const match2 = line.match(/(\d+)\.\s*(.+?):\s*(.+?)\s*\(Impact:\s*(High|Medium|Low)\)/i);
+      
+      if (match1) {
+        const [, , title, description, impact] = match1;
+        recommendations.push({
+          type: 'savings',
+          title: title.trim(),
+          description: description.trim(),
+          impact: impact.toLowerCase() as 'high' | 'medium' | 'low',
+          actionable: true
+        });
+      } else if (match2) {
+        const [, , title, description, impact] = match2;
+        recommendations.push({
+          type: 'savings',
+          title: title.trim(),
+          description: description.trim(),
+          impact: impact.toLowerCase() as 'high' | 'medium' | 'low',
+          actionable: true
+        });
+      }
+    });
+    
+    return recommendations;
   }
 
   private static getEndDateForPeriod(startDate: Date, period: string): Date {

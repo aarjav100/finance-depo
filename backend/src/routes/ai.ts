@@ -21,6 +21,29 @@ router.get('/recommendations', async (req: AuthRequest, res, next) => {
   }
 });
 
+// POST /api/ai/recommendations
+router.post('/recommendations', async (req: AuthRequest, res, next) => {
+  try {
+    const { prompt } = req.body;
+    
+    if (!prompt) {
+      return res.status(400).json({
+        error: 'Prompt is required',
+        message: 'Please provide a prompt for AI recommendations'
+      });
+    }
+
+    const recommendations = await AIService.generateCustomRecommendations(prompt);
+    
+    res.json({
+      message: 'AI recommendations generated successfully',
+      data: { recommendations }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/ai/spending-data
 router.get('/spending-data', async (req: AuthRequest, res, next) => {
   try {

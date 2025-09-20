@@ -30,12 +30,6 @@ export function Analytics() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (user) {
-      loadAnalyticsData();
-    }
-  }, [user, loadAnalyticsData]);
-
   const loadAnalyticsData = useCallback(async () => {
     setLoading(true);
     try {
@@ -50,6 +44,12 @@ export function Analytics() {
       setLoading(false);
     }
   }, [timeRange]);
+
+  useEffect(() => {
+    if (user) {
+      loadAnalyticsData();
+    }
+  }, [user, loadAnalyticsData]);
 
   const loadExpensesByCategory = async () => {
     try {

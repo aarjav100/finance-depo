@@ -92,10 +92,19 @@ export function AIRecommendations() {
       }
 
       const data: SpendingData = {
-        totalExpenses: analytics.totalExpenses || 0,
-        monthlyExpenses: analytics.monthlyExpenses || 0,
-        categoryBreakdown,
-        budgetStatus
+        totalExpenses: Number(analytics.totalExpenses) || 0,
+        monthlyExpenses: Number(analytics.monthlyExpenses) || 0,
+        categoryBreakdown: categoryBreakdown.map(cat => ({
+          category: cat.category || 'Unknown',
+          amount: Number(cat.amount) || 0,
+          percentage: Number(cat.percentage) || 0
+        })),
+        budgetStatus: budgetStatus.map(budget => ({
+          category: budget.category || 'Unknown',
+          budget: Number(budget.budget) || 0,
+          spent: Number(budget.spent) || 0,
+          percentage: Number(budget.percentage) || 0
+        }))
       };
 
       setSpendingData(data);
@@ -122,13 +131,13 @@ export function AIRecommendations() {
     const recs: Recommendation[] = [];
 
     // High spending category recommendation
-    if (data.categoryBreakdown.length > 0) {
+    if (data.categoryBreakdown && data.categoryBreakdown.length > 0) {
       const topCategory = data.categoryBreakdown[0];
-      if (topCategory.percentage > 40) {
+      if (topCategory && topCategory.percentage > 40) {
         recs.push({
           type: 'category',
           title: `High ${topCategory.category} Spending`,
-          description: `${topCategory.category} represents ${topCategory.percentage.toFixed(1)}% of your expenses ($${topCategory.amount.toFixed(2)}). Consider reviewing these expenses for potential savings.`,
+          description: `${topCategory.category} represents ${(topCategory.percentage || 0).toFixed(1)}% of your expenses ($${(topCategory.amount || 0).toFixed(2)}). Consider reviewing these expenses for potential savings.`,
           impact: 'high',
           actionable: true
         });
@@ -136,17 +145,19 @@ export function AIRecommendations() {
     }
 
     // Budget alerts
-    data.budgetStatus.forEach(budget => {
-      if (budget.percentage >= 90) {
-        recs.push({
-          type: 'budget',
-          title: `Budget Alert: ${budget.category}`,
-          description: `You've spent ${budget.percentage.toFixed(1)}% of your ${budget.category} budget ($${budget.spent.toFixed(2)} of $${budget.budget.toFixed(2)}).`,
-          impact: budget.percentage >= 100 ? 'high' : 'medium',
-          actionable: true
-        });
-      }
-    });
+    if (data.budgetStatus && data.budgetStatus.length > 0) {
+      data.budgetStatus.forEach(budget => {
+        if (budget && budget.percentage >= 90) {
+          recs.push({
+            type: 'budget',
+            title: `Budget Alert: ${budget.category}`,
+            description: `You've spent ${(budget.percentage || 0).toFixed(1)}% of your ${budget.category} budget ($${(budget.spent || 0).toFixed(2)} of $${(budget.budget || 0).toFixed(2)}).`,
+            impact: budget.percentage >= 100 ? 'high' : 'medium',
+            actionable: true
+          });
+        }
+      });
+    }
 
     // Savings opportunity
     if (data.monthlyExpenses > 0) {
@@ -161,7 +172,7 @@ export function AIRecommendations() {
     }
 
     // General financial health
-    if (data.categoryBreakdown.length > 5) {
+    if (data.categoryBreakdown && data.categoryBreakdown.length > 5) {
       recs.push({
         type: 'trend',
         title: 'Spending Diversification',
@@ -208,17 +219,17 @@ export function AIRecommendations() {
       const prompt = `As a personal finance advisor, analyze this spending data and provide 3-5 specific, actionable recommendations:
 
 Spending Summary:
-- Total Expenses: $${spendingData.totalExpenses.toFixed(2)}
-- This Month: $${spendingData.monthlyExpenses.toFixed(2)}
+- Total Expenses: $${(spendingData.totalExpenses || 0).toFixed(2)}
+- This Month: $${(spendingData.monthlyExpenses || 0).toFixed(2)}
 
 Category Breakdown:
-${spendingData.categoryBreakdown.map(cat => 
-  `- ${cat.category}: $${cat.amount.toFixed(2)} (${cat.percentage.toFixed(1)}%)`
+${(spendingData.categoryBreakdown || []).map(cat => 
+  `- ${cat.category || 'Unknown'}: $${(cat.amount || 0).toFixed(2)} (${(cat.percentage || 0).toFixed(1)}%)`
 ).join('\n')}
 
 Budget Status:
-${spendingData.budgetStatus.map(budget => 
-  `- ${budget.category}: $${budget.spent.toFixed(2)} of $${budget.budget.toFixed(2)} (${budget.percentage.toFixed(1)}%)`
+${(spendingData.budgetStatus || []).map(budget => 
+  `- ${budget.category || 'Unknown'}: $${(budget.spent || 0).toFixed(2)} of $${(budget.budget || 0).toFixed(2)} (${(budget.percentage || 0).toFixed(1)}%)`
 ).join('\n')}
 
 Provide recommendations in this format:
@@ -242,15 +253,14 @@ Focus on practical, actionable advice for improving financial health.`;
       }
 
       const result = await response.json();
-      const aiText = result.data.recommendations;
-      const aiRecs = parseAIRecommendations(aiText);
+      const aiRecs = result.data.recommendations || [];
       
       // Combine rule-based and AI recommendations
       setRecommendations(prev => [...prev, ...aiRecs]);
       
       toast({
         title: "Success",
-        description: "AI recommendations generated successfully"
+        description: aiRecs.length > 0 ? "AI recommendations generated successfully" : "Using general financial recommendations"
       });
     } catch (error: any) {
       console.error('Error generating AI recommendations:', error);
@@ -264,26 +274,6 @@ Focus on practical, actionable advice for improving financial health.`;
     }
   };
 
-  const parseAIRecommendations = (aiText: string): Recommendation[] => {
-    const lines = aiText.split('\n').filter(line => line.trim());
-    const recs: Recommendation[] = [];
-
-    lines.forEach(line => {
-      const match = line.match(/(\d+)\.\s*\[?(.+?)\]?\s*-\s*(.+?)\s*\(Impact:\s*(High|Medium|Low)\)/i);
-      if (match) {
-        const [, , title, description, impact] = match;
-        recs.push({
-          type: 'savings',
-          title: title.trim(),
-          description: description.trim(),
-          impact: impact.toLowerCase() as 'high' | 'medium' | 'low',
-          actionable: true
-        });
-      }
-    });
-
-    return recs;
-  };
 
   const getImpactColor = (impact: string) => {
     switch (impact) {
